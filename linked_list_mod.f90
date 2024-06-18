@@ -78,7 +78,7 @@ contains
   !> Add a value to the list at the tail
   subroutine append(this, value)
     class(LinkedList), intent(inout) :: this
-    class(*), intent(in), pointer    :: value
+    class(*), intent(in),target      :: value
 
     class(LinkedListNode), pointer :: node_ptr, next_ptr, current_ptr
 
