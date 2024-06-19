@@ -17,7 +17,7 @@ program overlap_demonstrator
     integer :: nactive
     integer :: ndone
     integer :: ncomm_started
-    type(Comm), pointer :: ic
+    type(LinkedListNode), pointer :: ic
     type(LinkedListNode), pointer :: ib
     type(Batch), pointer :: this_batch
 
@@ -46,15 +46,19 @@ program overlap_demonstrator
         productive = .false.
         ic = active_comms%first()
         do while (associated(ic))
-            if (ic%value%complete()) then
+          select type (thisComm => ic%value)
+          type is (Comm)
+            if (thisComm%complete()) then
                 ! complete_comm(ic%value) step needed here?
-                this_batch = ic%value%my_batch
-                call active_comms%remove(ic)
+                this_batch = thisComm%my_batch
+!! remove() method not yet implemented?
+!!                call active_comms%remove(ic)
                 comm_compl = .true.
                 ncomm_started = ncomm_started - 1
                 exit
             end if
             ic = ic%next
+          end select
         end do
         
         if (comm_compl) then
@@ -62,12 +66,15 @@ program overlap_demonstrator
             ! pending, if there is one
             ib = active_batches%first()
             do while (associated(ib))
-                if (ib%value%status == pending) then
+              select type (thisBatch => ib%value)
+              type is (Batch)
+                if (thisBatch%status == stat_pending) then
                     !call start(ib%value%comm_dep)
                     ncomm_started = ncomm_started + 1
                     exit
                 end if
                 ib = ib%next
+              end select
             end do
 
             productive = .true.
@@ -76,11 +83,15 @@ program overlap_demonstrator
                 ! If batch has completed, remove it from the active batches list (requires a search)
                 ib = active_batches%first()
                 do while (associated(ib))
-                    if (ib%value%id == this_batch%id) then
-                        call active_batches%remove(ib)
+                  select type (listBatch => ib%value)
+                  type is (Batch)
+                    if (listBatch%id == this_batch%id) then
+!! remove() method not yet implemented?
+!!                        call active_batches%remove(ib)
                         exit
                     end if
                     ib = ib%next
+                  end select
                 end do
                 nactive = nactive - 1
                 ndone = ndone + 1
@@ -88,11 +99,14 @@ program overlap_demonstrator
         else
             ib = active_batches%first()
             do while (associated(ib))
-                if (ib%value%status /= stat_waiting) then
+              select type (thisBatch =>ib%value)
+              type is (Batch)
+                if (thisBatch%status /= stat_waiting) then
                     productive = .true.
-                    call ib%value%execute
-                    if (ib%value%stage == stage_final) then
-                        call active_batches%remove(ib)
+                    call thisBatch%execute
+                    if (thisBatch%stage == stage_final) then
+!! remove() method not yet implemented?
+!!                        call active_batches%remove(ib)
                         nactive = nactive - 1
                         ndone = ndone + 1
                         if (.not. associated(active_batches%first())) then
@@ -101,6 +115,7 @@ program overlap_demonstrator
                     end if
                 end if
                 ib = ib%next
+              end select
             end do
 
             if (.not. productive) then
@@ -117,8 +132,8 @@ contains
     subroutine activate(n)
         integer, intent(in) :: n
 
-        type(Batch), pointer :: new_batch
-        type(Comm), pointer :: new_comm
+        type(Batch) :: new_batch
+        type(Comm)  :: new_comm
 
         new_batch = Batch(n)
         new_comm = Comm(new_batch)
@@ -132,8 +147,8 @@ contains
             new_batch%status = stat_pending
         endif
 
-        call active_comms%append_node(new_comm)
-        call active_batches%append_node(new_batch)
+        call active_comms%append(new_comm)
+        call active_batches%append(new_batch)
     end subroutine activate
 
     subroutine print_ids(node)
