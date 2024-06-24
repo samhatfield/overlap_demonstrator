@@ -26,7 +26,7 @@ program overlap_demonstrator
     ! if (associated(active_batches%head)) write(*,*) "head is active"
     ! if (.not. associated(active_batches%head%next)) write(*,*) "head has no next"
     ! if (.not. associated(active_batches%tail%next)) write(*,*) "tail has no next"
-    call activate(2)
+!    call activate(2)
     ! if (associated(active_batches%head)) write(*,*) "head is active"
     ! if (.not. associated(active_batches%head%next)) write(*,*) "head has no next"
     ! if (.not. associated(active_batches%tail%next)) write(*,*) "tail has no next"
@@ -52,7 +52,7 @@ program overlap_demonstrator
                 ! complete_comm(ic%value) step needed here?
                 this_batch = thisComm%my_batch
 !! remove() method not yet implemented?
-!!                call active_comms%remove(ic)
+                call active_comms%remove(ic)
                 comm_compl = .true.
                 ncomm_started = ncomm_started - 1
                 exit
@@ -87,7 +87,7 @@ program overlap_demonstrator
                   type is (Batch)
                     if (listBatch%id == this_batch%id) then
 !! remove() method not yet implemented?
-!!                        call active_batches%remove(ib)
+                        call active_batches%remove(ib)
                         exit
                     end if
                     ib = ib%next
@@ -106,7 +106,7 @@ program overlap_demonstrator
                     call thisBatch%execute
                     if (thisBatch%stage == stage_final) then
 !! remove() method not yet implemented?
-!!                        call active_batches%remove(ib)
+                        call active_batches%remove(ib)
                         nactive = nactive - 1
                         ndone = ndone + 1
                         if (.not. associated(active_batches%first())) then

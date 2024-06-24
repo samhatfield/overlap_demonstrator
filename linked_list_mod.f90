@@ -22,6 +22,7 @@ module linked_list_m
   type, public :: LinkedListNode
      class(*), pointer               :: value    => null()
      type(LinkedListNode), pointer   :: next     => null()
+     type(LinkedListNode), pointer   :: prev     => null()
    contains
      final :: nodefinalize
   end type LinkedListNode
@@ -39,6 +40,7 @@ module linked_list_m
    contains
      procedure :: append
      procedure :: append_node
+     procedure :: remove
      procedure :: first
      procedure :: last
      procedure :: atindex
@@ -72,6 +74,7 @@ contains
        deallocate(this%value)
        nullify(this%value)
        nullify(this%next)
+       nullify(this%prev)
     end if
   end subroutine nodefinalize
 
@@ -94,6 +97,7 @@ contains
     else
        this%tail%next => node_ptr
        this%tail      => node_ptr
+       node_ptr%prev => this%tail
     end if
 
   end subroutine append
@@ -114,13 +118,30 @@ contains
     else
        this%tail%next => node
        this%tail      => node
+       node%prev => this%tail
        write(*,*) "added subsequent node"
     end if
     if (.not. associated(this%tail%next)) write(*,*) "tail has no next"
 
   end subroutine append_node
 
-  !> Traverse the list
+  subroutine remove(this, node)
+    class(LinkedList), intent(inout)          :: this
+    type(LinkedListNode), intent(inout), pointer :: node
+
+    if(.not. associated(node%prev)) then
+       this%head => node%next
+    else
+       node%prev%next = node%next
+    endif
+    if(.not. associated(node%next)) then
+       this%tail => node%prev
+    endif
+    nullify(node)
+    
+  end subroutine remove
+  
+    !> Traverse the list
   subroutine traverse(this, iterator_func)
     class(LinkedList), intent(inout) :: this
     interface
@@ -167,7 +188,8 @@ contains
   ! Get the first node
   function first(this) result(firstnode)
     class(LinkedList), intent(in) :: this
-    type(LinkedListNode), pointer :: firstnode
+    class(LinkedListNode), pointer :: firstnode
+!    type(LinkedListNode), pointer :: firstnode
 
     firstnode => this%head
 
