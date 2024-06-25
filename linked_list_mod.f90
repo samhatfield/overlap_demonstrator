@@ -138,7 +138,7 @@ contains
        write(*,*) "traverse: element", counter
        nullify(temp_ptr)
        temp_ptr => current_ptr%next
-       !call iterator_func(current_ptr)
+       call iterator_func(current_ptr)
        current_ptr => temp_ptr
     end do
 

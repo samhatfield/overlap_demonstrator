@@ -23,17 +23,14 @@ program overlap_demonstrator
 
     ! Activate first batch
     call activate(1)
-    ! if (associated(active_batches%head)) write(*,*) "head is active"
-    ! if (.not. associated(active_batches%head%next)) write(*,*) "head has no next"
-    ! if (.not. associated(active_batches%tail%next)) write(*,*) "tail has no next"
-!    call activate(2)
-    ! if (associated(active_batches%head)) write(*,*) "head is active"
-    ! if (.not. associated(active_batches%head%next)) write(*,*) "head has no next"
-    ! if (.not. associated(active_batches%tail%next)) write(*,*) "tail has no next"
+    call activate(2)
+    call activate(3)
 
     call active_batches%traverse(print_ids)
 
-    !ic => active_comms%head
+    call active_batches%remove(active_batches%head%next)
+
+    call active_batches%traverse(print_ids)
 
     nactive = 1
     ndone = 0
@@ -154,7 +151,7 @@ contains
     subroutine print_ids(node)
         type(LinkedListNode), pointer, intent(inout) :: node
 
-        select type(p => node)
+        select type(p => node%value)
             type is(Batch)
                 write(*,*) p%id
             type is(Comm)
