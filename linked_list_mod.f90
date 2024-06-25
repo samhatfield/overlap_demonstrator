@@ -108,7 +108,7 @@ contains
     if(.not. associated(node%prev)) then
        this%head => node%next
     else
-       node%prev%next = node%next
+       node%prev%next => node%next
     endif
     if(.not. associated(node%next)) then
        this%tail => node%prev
