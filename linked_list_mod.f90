@@ -39,7 +39,6 @@ module linked_list_m
      class(LinkedListNode), pointer :: tail => null()
    contains
      procedure :: append
-     procedure :: append_node
      procedure :: remove
      procedure :: first
      procedure :: last
@@ -101,29 +100,6 @@ contains
     end if
 
   end subroutine append
-
-  !> Add a value to the list at the tail
-  subroutine append_node(this, node)
-    class(LinkedList), intent(inout)          :: this
-    class(LinkedListNode), intent(in), pointer :: node
-
-    this%size = this%size + 1_ki4
-
-    if (.not. associated(node%next)) write(*,*) "adding node with no next"
-
-    if(.not. associated(this%head))then
-       this%head => node
-       this%tail => node
-       write(*,*) "added first node"
-    else
-       this%tail%next => node
-       this%tail      => node
-       node%prev => this%tail
-       write(*,*) "added subsequent node"
-    end if
-    if (.not. associated(this%tail%next)) write(*,*) "tail has no next"
-
-  end subroutine append_node
 
   subroutine remove(this, node)
     class(LinkedList), intent(inout)          :: this
