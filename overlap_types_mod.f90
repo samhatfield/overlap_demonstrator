@@ -7,7 +7,7 @@ module overlap_types_mod
     integer, public, parameter :: stat_waiting = 1
     integer, public, parameter :: stat_pending = 2
 
-    type, extends(LinkedListNode), public :: Batch
+    type, public :: Batch
         integer :: stage
         integer :: status
         integer :: id
@@ -21,7 +21,7 @@ module overlap_types_mod
         module procedure :: batch_constructor
     end interface Batch
 
-    type, extends(LinkedListNode), public :: Comm
+    type, public :: Comm
         type(Batch), pointer :: my_batch
     contains
         procedure :: complete => comm_complete
@@ -45,9 +45,6 @@ contains
         this%stage = 1
         this%status = stat_waiting
         this%id = batch_index
-        this%next => null()
-
-        write(*,*) "New batch allocated"
     end function batch_constructor
 
     subroutine batch_associate_comm(this, my_comm)
@@ -73,7 +70,6 @@ contains
         type(Comm) :: this
 
         this%my_batch => my_batch
-        this%next => null()
     end function comm_constructor
 
     function comm_complete(this)
