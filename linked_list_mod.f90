@@ -35,8 +35,8 @@ module linked_list_m
   type, public :: LinkedList
      !private
      integer(ki4)                  :: size = 0_ki4
-     class(LinkedListNode), pointer :: head => null()
-     class(LinkedListNode), pointer :: tail => null()
+     type(LinkedListNode), pointer :: head => null()
+     type(LinkedListNode), pointer :: tail => null()
    contains
      procedure :: append
      procedure :: remove
@@ -82,7 +82,7 @@ contains
     class(LinkedList), intent(inout) :: this
     class(*), intent(in),target      :: value
 
-    class(LinkedListNode), pointer :: node_ptr, next_ptr, current_ptr
+    type(LinkedListNode), pointer :: node_ptr, next_ptr, current_ptr
 
     ! Create a new node and set the value
     allocate(node_ptr)
@@ -123,11 +123,11 @@ contains
     interface
        subroutine iterator_func(node)
          import LinkedListNode
-         class(LinkedListNode), pointer, intent(inout)  :: node
+         type(LinkedListNode), pointer, intent(inout)  :: node
        end subroutine iterator_func
     end interface
 
-    class(LinkedListNode), pointer :: current_ptr, temp_ptr
+    type(LinkedListNode), pointer :: current_ptr, temp_ptr
     integer :: counter
 
     counter = 0
@@ -164,7 +164,7 @@ contains
   ! Get the first node
   function first(this) result(firstnode)
     class(LinkedList), intent(in) :: this
-    class(LinkedListNode), pointer :: firstnode
+    type(LinkedListNode), pointer :: firstnode
 !    type(LinkedListNode), pointer :: firstnode
 
     firstnode => this%head
@@ -211,7 +211,7 @@ contains
   subroutine cleanup(this)
     class(LinkedList), intent(inout) :: this
 
-    class(LinkedListNode), pointer    :: current_ptr
+    type(LinkedListNode), pointer    :: current_ptr
 
     call this%traverse(destroyall)
     nullify(this%head)
@@ -219,7 +219,7 @@ contains
 
   contains
     subroutine destroyall(node)
-      class(LinkedListNode), pointer, intent(inout)  :: node
+      type(LinkedListNode), pointer, intent(inout)  :: node
 
       this%head => node%next
       deallocate(node)

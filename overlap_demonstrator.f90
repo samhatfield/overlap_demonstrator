@@ -152,7 +152,7 @@ contains
     end subroutine activate
 
     subroutine print_ids(node)
-        class(LinkedListNode), pointer, intent(inout) :: node
+        type(LinkedListNode), pointer, intent(inout) :: node
 
         select type(p => node)
             type is(Batch)
