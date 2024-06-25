@@ -95,8 +95,8 @@ contains
        this%tail => node_ptr
     else
        this%tail%next => node_ptr
+       node_ptr%prev  => this%tail
        this%tail      => node_ptr
-       node_ptr%prev => this%tail
     end if
 
   end subroutine append
