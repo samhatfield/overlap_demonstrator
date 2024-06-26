@@ -38,7 +38,7 @@ module linked_list_m
      type(LinkedListNode), pointer :: head => null()
      type(LinkedListNode), pointer :: tail => null()
    contains
-!     procedure :: append
+     procedure :: append
      procedure :: remove
      procedure :: first
      procedure :: last
@@ -78,33 +78,33 @@ contains
   end subroutine nodefinalize
 
   !> Add a value to the list at the tail
-!  subroutine append(this, value)
-!    class(LinkedList), intent(inout) :: this
-!    class(*), intent(in),target      :: value
+  subroutine append(this, value)
+    class(LinkedList), intent(inout) :: this
+    class(*), intent(in),target      :: value
 
-!    type(LinkedListNode), pointer :: node_ptr, next_ptr, current_ptr
+    type(LinkedListNode), pointer :: node_ptr, next_ptr, current_ptr
 
     ! Create a new node and set the value
-!    allocate(node_ptr)
-!    node_ptr%value => value
-!    node_ptr%next => null()
-!    this%size = this%size + 1_ki4
+    allocate(node_ptr)
+    node_ptr%value => value
+    node_ptr%next => null()
+    this%size = this%size + 1_ki4
 
-!    if(.not. associated(this%head))then
-!       this%head => node_ptr
-!       this%tail => node_ptr
-!    else
-!       this%tail%next => node_ptr
-!       node_ptr%prev  => this%tail
-!       this%tail      => node_ptr
-!    end if
+    if(.not. associated(this%head))then
+       this%head => node_ptr
+       this%tail => node_ptr
+    else
+       this%tail%next => node_ptr
+       node_ptr%prev  => this%tail
+       this%tail      => node_ptr
+    end if
 
-!  end subroutine append
+  end subroutine append
 
   subroutine remove(this, node)
-    class(LinkedList), intent(inout)          :: this
+    class(LinkedList), intent(inout)             :: this
     type(LinkedListNode), intent(inout), pointer :: node
-    
+
     if(.not. associated(node%prev)) then
        this%head => node%next
     else
@@ -113,12 +113,12 @@ contains
     if(.not. associated(node%next)) then
        this%tail => node%prev
     endif
-    !    nullify(node)
     deallocate(node%value)
-    
+    nullify(node)
+
   end subroutine remove
-  
-    !> Traverse the list
+
+  !> Traverse the list
   subroutine traverse(this, iterator_func)
     class(LinkedList), intent(inout) :: this
     interface
@@ -136,7 +136,6 @@ contains
     current_ptr => this%head
     do while(associated(current_ptr) .and. counter < 10)
        counter = counter + 1
-       write(*,*) "traverse: element", counter
        nullify(temp_ptr)
        temp_ptr => current_ptr%next
        call iterator_func(current_ptr)
@@ -166,7 +165,6 @@ contains
   function first(this) result(firstnode)
     class(LinkedList), intent(in) :: this
     type(LinkedListNode), pointer :: firstnode
-!    type(LinkedListNode), pointer :: firstnode
 
     firstnode => this%head
 
