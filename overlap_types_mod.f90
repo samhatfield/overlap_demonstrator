@@ -130,14 +130,12 @@ contains
     ! Comm methods
     ! -----------------------------------------------------------------------------
 
-    function comm_constructor(comm_index, my_batch) result(this)
+    function comm_constructor(comm_index) result(this)
         integer, intent(in)             :: comm_index
-        type(Batch), intent(in), target :: my_batch
 
         type(Comm) :: this
 
         this%id = comm_index
-        allocate(this%my_batch, source=my_batch)
     end function comm_constructor
 
     function comm_complete(this)

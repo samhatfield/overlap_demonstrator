@@ -152,23 +152,27 @@ contains
     subroutine activate(n)
         integer, intent(in) :: n
 
-        type(Batch) :: new_batch
-        type(Comm)  :: new_comm
+        ! Add a new Batch and Comm to the respective lists
+        call active_batches%append(Batch(n))
+        call active_comms%append(Comm(n))
 
-        new_batch = Batch(n)
-        new_comm = Comm(n, new_batch)
-        call new_batch%associate_comm(new_comm)
-
-        if (ncomm_started < max_comms) then
-            ncomm_started = ncomm_started + 1
-            !call start(new_comm)
-            new_batch%status = stat_waiting
-        else
-            new_batch%status = stat_pending
-        endif
-
-        call active_comms%append(new_comm)
-        call active_batches%append(new_batch)
+        select type (new_batch => active_batches%tail%value)
+        type is (Batch)
+            select type(new_comm => active_comms%tail%value)
+            type is (Comm)
+                ! Associate new Batch and Comm with each other
+                new_comm%my_batch => new_batch
+                new_batch%my_comm => new_comm
+            end select
+            ! Start communication or set as pending
+            if (ncomm_started < max_comms) then
+                ncomm_started = ncomm_started + 1
+                !call start(new_comm)
+                new_batch%status = stat_waiting
+            else
+                new_batch%status = stat_pending
+            endif
+        end select
         write(*,*) "batch/comm", n, "activated"
     end subroutine activate
 
