@@ -1,5 +1,5 @@
 module overlap_types_mod
-    use linked_list_m, only: LinkedListNode
+    use linked_list_m  ! , only: LinkedListNode
 
     implicit none
     private
@@ -7,8 +7,8 @@ module overlap_types_mod
     integer, public, parameter :: stat_waiting = 1
     integer, public, parameter :: stat_pending = 2
 
-    type, extends(LinkedListNode), public :: Batch
-        integer :: stage
+    type, public :: Batch
+       integer :: stage
         integer :: status
         integer :: id
         type(Comm), pointer :: my_comm
@@ -17,11 +17,13 @@ module overlap_types_mod
         procedure :: execute => batch_execute
     end type Batch
 
+    
+
     interface Batch
         module procedure :: batch_constructor
     end interface Batch
 
-    type, extends(LinkedListNode), public :: Comm
+    type, public :: Comm
         type(Batch), pointer :: my_batch
     contains
         procedure :: complete => comm_complete
@@ -31,7 +33,82 @@ module overlap_types_mod
     interface Comm
         module procedure :: comm_constructor
     end interface Comm
+
+!      type, public, extends(linkedlistnode) :: Batch_node
+!       class(Batch), pointer :: b
+!    end type Batch_node
+
+!      type, public, extends(linkedlistnode) :: Comm_node
+!       class(Comm), pointer :: c
+!    end type Comm_node
+
+    type, public, extends(linkedlist) :: Batch_list
+     contains
+       procedure :: append_batch
+       generic :: append => append_batch
+    end type Batch_list
+
+    type, public, extends(linkedlist) :: Comm_list
+     contains
+       procedure :: append_comm
+       generic :: append => append_comm
+    end type Comm_list
+
 contains
+
+
+    !> Add a value to the list at the tail
+  subroutine append_batch(this, value)
+    class(Batch_List), intent(inout) :: this
+    class(Batch), intent(in),target      :: value
+!    class(*), allocatable, target :: v
+    
+    type(LinkedListNode), pointer :: node_ptr, next_ptr, current_ptr
+
+!    allocate(v,source=value)
+    
+    ! Create a new node and set the value
+    allocate(node_ptr)
+    allocate(node_ptr%value,source=value)
+    node_ptr%next => null()
+    this%size = this%size + 1
+
+    if(.not. associated(this%head))then
+       this%head => node_ptr
+       this%tail => node_ptr
+    else
+       this%tail%next => node_ptr
+       node_ptr%prev  => this%tail
+       this%tail      => node_ptr
+    end if
+
+  end subroutine append_batch
+
+      !> Add a value to the list at the tail
+  subroutine append_comm(this, value)
+    class(Comm_List), intent(inout) :: this
+    class(Comm), intent(in),target      :: value
+
+    type(LinkedListNode), pointer :: node_ptr, next_ptr, current_ptr
+    class(*), allocatable, target :: v
+
+    allocate(v,source=value)
+    ! Create a new node and set the value
+    allocate(node_ptr)
+    node_ptr%value => v
+    node_ptr%next => null()
+    this%size = this%size + 1
+
+    if(.not. associated(this%head))then
+       this%head => node_ptr
+       this%tail => node_ptr
+    else
+       this%tail%next => node_ptr
+       node_ptr%prev  => this%tail
+       this%tail      => node_ptr
+    end if
+
+  end subroutine append_comm
 
     ! -----------------------------------------------------------------------------
     ! Batch methods
@@ -45,9 +122,6 @@ contains
         this%stage = 1
         this%status = stat_waiting
         this%id = batch_index
-        this%next => null()
-
-        write(*,*) "New batch allocated"
     end function batch_constructor
 
     subroutine batch_associate_comm(this, my_comm)
@@ -73,7 +147,6 @@ contains
         type(Comm) :: this
 
         this%my_batch => my_batch
-        this%next => null()
     end function comm_constructor
 
     function comm_complete(this)

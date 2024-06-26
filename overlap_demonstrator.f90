@@ -1,11 +1,11 @@
 program overlap_demonstrator
-    use linked_list_m, only: LinkedList, LinkedListNode
-    use overlap_types_mod, only: Batch, Comm, stat_waiting, stat_pending
+    use linked_list_m  !, only: LinkedList, LinkedListNode
+    use overlap_types_mod !, only: Batch, Comm, stat_waiting, stat_pending
 
     implicit none
 
-    type(LinkedList) :: active_comms
-    type(LinkedList) :: active_batches
+    type(Comm_List) :: active_comms
+    type(Batch_List) :: active_batches
 
     integer, parameter :: nbatches = 10
     integer, parameter :: max_comms = 5
@@ -20,20 +20,35 @@ program overlap_demonstrator
     type(LinkedListNode), pointer :: ic
     type(LinkedListNode), pointer :: ib
     type(Batch), pointer :: this_batch
+    class(Batch), allocatable :: p
+    integer id1,id2
 
     ! Activate first batch
     call activate(1)
-    ! if (associated(active_batches%head)) write(*,*) "head is active"
-    ! if (.not. associated(active_batches%head%next)) write(*,*) "head has no next"
-    ! if (.not. associated(active_batches%tail%next)) write(*,*) "tail has no next"
-!    call activate(2)
-    ! if (associated(active_batches%head)) write(*,*) "head is active"
-    ! if (.not. associated(active_batches%head%next)) write(*,*) "head has no next"
-    ! if (.not. associated(active_batches%tail%next)) write(*,*) "tail has no next"
+    call activate(2)
+    call activate(3)
 
     call active_batches%traverse(print_ids)
 
-    !ic => active_comms%head
+   ib => active_batches%head%next
+!    allocate(p,source=ib%value)
+!    id1 = p%id
+!    deallocate(p)
+!    allocate(p,source=ib%next%value)
+!    id2 = p%id
+!    deallocate(p)
+!    print *,'Removing id ',id1,', next id=',id2
+    call active_batches%remove(ib)
+!    ib => active_batches%head%next
+!    allocate(p,source=ib%value)
+!    id1 = p%id
+!    deallocate(p)
+!    allocate(p,source=ib%next%value)
+!    id2 = p%id
+!    deallocate(p)
+!    print *,'After removal: ',id1,id2
+
+    call active_batches%traverse(print_ids)
 
     nactive = 1
     ndone = 0
@@ -44,7 +59,8 @@ program overlap_demonstrator
         ! Check whether any active communications have completed
         comm_compl = .false.
         productive = .false.
-        ic = active_comms%first()
+!        ic = active_comms%first()
+        ic = active_comms%head
         do while (associated(ic))
           select type (thisComm => ic%value)
           type is (Comm)
@@ -151,13 +167,15 @@ contains
         call active_batches%append(new_batch)
     end subroutine activate
 
-    subroutine print_ids(node)
-        class(LinkedListNode), pointer, intent(inout) :: node
-
-        select type(p => node)
-            type is(Batch)
-                write(*,*) p%id
-            type is(Comm)
+  subroutine print_ids(node)
+    type(LinkedListNode), pointer, intent(inout) :: node
+    class(Batch), pointer :: ptr
+    
+        select type(p => node%value)
+            class is(Batch)
+               ptr => p
+               write(*,*) ptr%id
+            class is(Comm)
                 write(*,*) "Got Comm"
         class default
             write(*,*) "ERROR"
