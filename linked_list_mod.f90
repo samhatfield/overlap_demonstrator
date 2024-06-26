@@ -38,7 +38,7 @@ module linked_list_m
      type(LinkedListNode), pointer :: head => null()
      type(LinkedListNode), pointer :: tail => null()
    contains
-     procedure :: append
+!     procedure :: append
      procedure :: remove
      procedure :: first
      procedure :: last
@@ -78,33 +78,33 @@ contains
   end subroutine nodefinalize
 
   !> Add a value to the list at the tail
-  subroutine append(this, value)
-    class(LinkedList), intent(inout) :: this
-    class(*), intent(in),target      :: value
+!  subroutine append(this, value)
+!    class(LinkedList), intent(inout) :: this
+!    class(*), intent(in),target      :: value
 
-    type(LinkedListNode), pointer :: node_ptr, next_ptr, current_ptr
+!    type(LinkedListNode), pointer :: node_ptr, next_ptr, current_ptr
 
     ! Create a new node and set the value
-    allocate(node_ptr)
-    node_ptr%value => value
-    node_ptr%next => null()
-    this%size = this%size + 1_ki4
+!    allocate(node_ptr)
+!    node_ptr%value => value
+!    node_ptr%next => null()
+!    this%size = this%size + 1_ki4
 
-    if(.not. associated(this%head))then
-       this%head => node_ptr
-       this%tail => node_ptr
-    else
-       this%tail%next => node_ptr
-       node_ptr%prev  => this%tail
-       this%tail      => node_ptr
-    end if
+!    if(.not. associated(this%head))then
+!       this%head => node_ptr
+!       this%tail => node_ptr
+!    else
+!       this%tail%next => node_ptr
+!       node_ptr%prev  => this%tail
+!       this%tail      => node_ptr
+!    end if
 
-  end subroutine append
+!  end subroutine append
 
   subroutine remove(this, node)
     class(LinkedList), intent(inout)          :: this
     type(LinkedListNode), intent(inout), pointer :: node
-
+    
     if(.not. associated(node%prev)) then
        this%head => node%next
     else
@@ -113,7 +113,8 @@ contains
     if(.not. associated(node%next)) then
        this%tail => node%prev
     endif
-    nullify(node)
+    !    nullify(node)
+    deallocate(node%value)
     
   end subroutine remove
   
