@@ -22,6 +22,7 @@ module overlap_types_mod
     end interface Batch
 
     type, public :: Comm
+        integer :: id
         type(Batch), pointer :: my_batch
     contains
         procedure :: complete => comm_complete
@@ -120,19 +121,23 @@ contains
     subroutine batch_execute(this)
         class(Batch), intent(inout) :: this
 
-        ! Do nothing for now
+        ! Just set status to final for now
+        write(*,*) "Batch", this%id, "executing"
+        this%stage = 2
     end subroutine batch_execute
 
     ! -----------------------------------------------------------------------------
     ! Comm methods
     ! -----------------------------------------------------------------------------
 
-    function comm_constructor(my_batch) result(this)
+    function comm_constructor(comm_index, my_batch) result(this)
+        integer, intent(in)             :: comm_index
         type(Batch), intent(in), target :: my_batch
 
         type(Comm) :: this
 
-        this%my_batch => my_batch
+        this%id = comm_index
+        allocate(this%my_batch, source=my_batch)
     end function comm_constructor
 
     function comm_complete(this)
@@ -140,6 +145,7 @@ contains
         logical :: comm_complete
 
         ! Test whether this comm has finished yet (just always true for now)
+        write(*,*) "Checking completion of comm", this%id
         comm_complete = .true.
     end function comm_complete
 
