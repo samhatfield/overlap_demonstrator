@@ -1,11 +1,11 @@
 program overlap_demonstrator
-    use linked_list_m  !, only: LinkedList, LinkedListNode
-    use overlap_types_mod !, only: Batch, Comm, stat_waiting, stat_pending
+    use linked_list_m  , only: LinkedList, LinkedListNode
+    use overlap_types_mod , only: Batch, Comm, stat_waiting, stat_pending, CommList, BatchList
 
     implicit none
 
-    type(Comm_List) :: active_comms
-    type(Batch_List) :: active_batches
+    type(CommList) :: active_comms
+    type(BatchList) :: active_batches
 
     integer, parameter :: nbatches = 10
     integer, parameter :: max_comms = 5
@@ -20,38 +20,25 @@ program overlap_demonstrator
     type(LinkedListNode), pointer :: ic
     type(LinkedListNode), pointer :: ib
     type(Batch), pointer :: this_batch
-    class(Batch), allocatable :: p
-    integer id1,id2
 
-    ! Activate first batch
+    ! Test everything works as expected
+    ! Activate three batches/comms
     call activate(1)
     call activate(2)
     call activate(3)
 
+    ! Print IDs of all active batches
     call active_batches%traverse(print_ids)
 
-   ib => active_batches%head%next
-!    allocate(p,source=ib%value)
-!    id1 = p%id
-!    deallocate(p)
-!    allocate(p,source=ib%next%value)
-!    id2 = p%id
-!    deallocate(p)
-!    print *,'Removing id ',id1,', next id=',id2
+    ! Remove middle batch
+    ib => active_batches%head%next
     call active_batches%remove(ib)
-!    ib => active_batches%head%next
-!    allocate(p,source=ib%value)
-!    id1 = p%id
-!    deallocate(p)
-!    allocate(p,source=ib%next%value)
-!    id2 = p%id
-!    deallocate(p)
-!    print *,'After removal: ',id1,id2
 
+    ! Print IDs again
     call active_batches%traverse(print_ids)
 
     nactive = 1
-    ndone = 0
+
     ncomm_started = 0
 
     ! Keep looping until all batches are complete
@@ -169,12 +156,10 @@ contains
 
     subroutine print_ids(node)
         type(LinkedListNode), pointer, intent(inout) :: node
-        class(Batch), pointer :: ptr
         
         select type(p => node%value)
             class is(Batch)
-               ptr => p
-               write(*,*) ptr%id
+                write(*,*) "Batch ID = ", p%id
             class is(Comm)
                 write(*,*) "Got Comm"
         class default
