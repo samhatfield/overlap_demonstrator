@@ -1,6 +1,8 @@
 module overlap_types_mod
     use linked_list_m, only: LinkedList, LinkedListNode
-
+    use common_data
+    use mpi
+    
     implicit none
     private
 
@@ -9,6 +11,9 @@ module overlap_types_mod
 
     type, public :: Batch
         integer :: stage
+        ! 1: Initialized trgtol, ready for GtoL comm
+        ! 2: Completed FFT, ready for LtoM comm
+        ! 3: Done
         integer :: status
         integer :: id
         type(Comm), pointer :: my_comm
@@ -23,9 +28,12 @@ module overlap_types_mod
 
     type, public :: Comm
         integer :: id
+        integer :: nops=1
         type(Batch), pointer :: my_batch
     contains
-        procedure :: complete => comm_complete
+      procedure :: start
+      procedure :: finish
+      procedure :: complete => comm_complete
         ! procedure :: get_batch
     end type Comm
 
@@ -103,12 +111,20 @@ contains
 
     function batch_constructor(batch_index) result(this)
         integer, intent(in) :: batch_index
-
+        integer i,itask
+        
         type(Batch) :: this
 
         this%stage = 1
         this%status = stat_waiting
         this%id = batch_index
+
+        do itask=1,ntasks
+           do i=1,numsend
+              sendbuf(i+off(itask),this%id) = this%id * 0.0001 + i + off(itask)
+           enddo
+        enddo
+        
     end function batch_constructor
 
     subroutine batch_associate_comm(this, my_comm)
@@ -120,10 +136,32 @@ contains
 
     subroutine batch_execute(this)
         class(Batch), intent(inout) :: this
-
-        ! Just set status to final for now
+        real r
+        integer i,j
+        
         write(*,*) "Batch", this%id, "executing"
-        this%stage = 2
+
+        select case (this%stage)
+        case (1)
+           ! Do FFT
+           call random_number(r)
+           do i=1,r*10000
+              j = j + i*i
+           enddo
+           print *,j
+        case(2)
+           ! Do Legendre
+           call random_number(r)
+           do i=1,r*40000
+              j = j + i*i
+           enddo
+           print *,j
+        case default
+        end select
+
+        this%stage = this%stage+1
+        ! Just set status to final for now
+        !this%stage = 2
     end subroutine batch_execute
 
     ! -----------------------------------------------------------------------------
@@ -131,20 +169,66 @@ contains
     ! -----------------------------------------------------------------------------
 
     function comm_constructor(comm_index) result(this)
-        integer, intent(in)             :: comm_index
-
+        integer, intent(in) :: comm_index
         type(Comm) :: this
-
+        
         this%id = comm_index
+        this%nops = 1
     end function comm_constructor
 
     function comm_complete(this)
-        class(Comm), intent(in) :: this
+      use mpi
+      
+      class(Comm), intent(in) :: this
         logical :: comm_complete
-
+        integer ierr,flg
+        
         ! Test whether this comm has finished yet (just always true for now)
         write(*,*) "Checking completion of comm", this%id
-        comm_complete = .true.
-    end function comm_complete
+        call mpi_testall(this%nops,recv_reqs(:,this%id),comm_complete,mpi_statuses_ignore,ierr)
+      end function comm_complete
 
+      subroutine start(this,stage)
+        use common_data
+        use mpi
+        implicit none
+      
+        class(Comm), intent(inout) :: this
+        integer, intent(in) :: stage
+        integer i,isource,idest,ierr
+
+        select case(stage)
+        case (1)
+           do i=1,ntasks-1
+              idest = mod(mytask+i,ntasks)
+              call mpi_isend(sendbuf(off(idest),this%id),numsend,MPI_REAL,idest, &
+                   mytask,mpi_comm_world,send_reqs(i,this%id),ierr)
+              isource = mod(mytask-i+ntasks,ntasks)
+              call mpi_irecv(recvbuf(off(isource),this%id),numrecv,MPI_REAL,isource,isource, &
+                   mpi_comm_world,recv_reqs(i,this%id),ierr)
+           enddo
+           this%nops = ntasks-1
+        case (2)
+           call mpi_ialltoall(sendbuf(1,this%id),numsend,MPI_REAL, &
+                   recvbuf(1,this%id),numrecv,MPI_FLOAT,mpi_comm_world,recv_reqs(1,this%id),ierr)
+        case default
+           print *,'ERROR: incorrect stage',stage
+        end select
+        
+      end subroutine start
+      
+      subroutine finish(this)
+        use mpi
+        implicit none
+
+        class(Comm), intent(in) :: this
+        integer ierr
+        
+        call mpi_waitall(this%nops,recv_reqs(:,this%id),mpi_statuses_ignore,ierr)
+        if(this%nops > 1) then
+           call mpi_waitall(this%nops,send_reqs(:,this%id),mpi_statuses_ignore,ierr)
+        endif
+        
+    end subroutine finish
+    
 end module overlap_types_mod

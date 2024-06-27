@@ -1,7 +1,9 @@
 program overlap_demonstrator
     use linked_list_m  , only: LinkedList, LinkedListNode
     use overlap_types_mod , only: Batch, Comm, stat_waiting, stat_pending, CommList, BatchList
-
+    use common_data
+    use mpi
+    
     implicit none
 
     type(CommList) :: active_comms
@@ -10,49 +12,66 @@ program overlap_demonstrator
     integer, parameter :: nbatches = 10
     integer, parameter :: max_comms = 5
     integer, parameter :: max_active_batches = 5
-    integer, parameter :: stage_final = 2
+    integer, parameter :: stage_final = 3
     logical :: comm_compl
     logical :: productive
 
     integer :: nactive
     integer :: ndone
     integer :: ncomm_started
-    integer :: ncurrent
+    integer :: ncurrent,ierr,i
     type(LinkedListNode), pointer :: ic
-    type(LinkedListNode), pointer :: ib
+    type(LinkedListNode), pointer :: ib,next
     type(Batch), pointer :: complete_comm_batch
 
     ! Test everything works as expected
-    write(*,*) "Testing BatchList/CommList functionality"
+ !   write(*,*) "Testing BatchList/CommList functionality"
 
     ! Activate three batches/comms
-    write(*,*) "Call activate 3 times"
-    call activate(1)
-    call activate(2)
-    call activate(3)
+ !   write(*,*) "Call activate 3 times"
+ !   call activate(1)
+ !   call activate(2)
+ !   call activate(3)
 
     ! Print IDs of all active batches
-    write(*,*) "Print all batch IDs"
-    call active_batches%traverse(print_ids)
+ !   write(*,*) "Print all batch IDs"
+ !   call active_batches%traverse(print_ids)
 
     ! Remove middle batch
-    write(*,*) "Remove middle batch"
-    ib => active_batches%head%next
-    call active_batches%remove(ib)
+ !   write(*,*) "Remove middle batch"
+ !   ib => active_batches%head%next
+ !   call active_batches%remove(ib)
 
     ! Print IDs again
-    write(*,*) "Print all batch IDs again"
-    call active_batches%traverse(print_ids)
+ !   write(*,*) "Print all batch IDs again"
+ !   call active_batches%traverse(print_ids)
 
     ! Remove all batches
-    write(*,*) "Reset"
-    call active_batches%reset
-    call active_comms%reset
+ !   write(*,*) "Reset"
+ !   call active_batches%reset
+ !   call active_comms%reset
 
     ! Now start the actual work
     write(*,*)
     write(*,*) "Now start the actual work"
 
+    call mpi_init(ierr)
+    call mpi_comm_rank(mpi_comm_world,mytask,ierr)
+    call mpi_comm_size(mpi_comm_world,ntasks,ierr)
+
+    numsend = 100000
+    numrecv = 100000
+    
+    allocate(sendbuf(numsend*ntasks,nbatches))
+    allocate(recvbuf(numrecv*ntasks,nbatches))
+    allocate(send_reqs(ntasks,nbatches))
+    allocate(recv_reqs(ntasks,nbatches))
+    allocate(off(ntasks))
+
+    do i=1,ntasks
+       off(i) = (i-1) * numsend
+    enddo
+    
     nactive = 1
     ndone = 0
     ncomm_started = 0
@@ -73,6 +92,7 @@ program overlap_demonstrator
                     ! complete_comm(ic%value) step needed here?
                     complete_comm_batch => thisComm%my_batch
                     write(*,*) "Comm", thisComm%id, " complete"
+                    call thisComm%finish
                     call active_comms%remove(ic)
                     comm_compl = .true.
                     ncomm_started = ncomm_started - 1
@@ -90,7 +110,7 @@ program overlap_demonstrator
                 select type (thisBatch => ib%value)
                 type is (Batch)
                     if (thisBatch%status == stat_pending) then
-                        !call start(ib%value%comm_dep)
+                        call thisBatch%my_comm%start(thisBatch%stage)
                         ncomm_started = ncomm_started + 1
                         exit
                     end if
@@ -101,8 +121,12 @@ program overlap_demonstrator
             productive = .true.
             call complete_comm_batch%execute
             if (complete_comm_batch%stage == stage_final) then
-                ! If batch has completed, remove it from the active batches list (requires a search)
-                ib => active_batches%head
+               ! If batch has completed, remove it from the active batches list (requires a search)
+
+               ! This doesn't work:
+!               call active_batches%remove(complete_comm_batch)
+               
+               ib => active_batches%head
                 do while (associated(ib))
                     select type (listBatch => ib%value)
                     type is (Batch)
@@ -121,30 +145,34 @@ program overlap_demonstrator
             do while (associated(ib))
                 select type (thisBatch =>ib%value)
                 type is (Batch)
-                    if (thisBatch%status /= stat_waiting) then
+                   if (thisBatch%status /= stat_waiting .and.  &
+                           thisBatch%status /= stat_pending) then
                         productive = .true.
                         call thisBatch%execute
-                        if (thisBatch%stage == 2) then
-                            call active_batches%remove(ib)
-                            nactive = nactive - 1
-                            ndone = ndone + 1
-                            if (.not. associated(active_batches%head)) then
-                                exit
-                            end if
+                        if (thisBatch%stage == stage_final) then
+                           next = ib%next
+                           call active_batches%remove(ib)
+                           nactive = nactive - 1
+                           ndone = ndone + 1
+                           if (.not. associated(active_batches%head)) then
+                              exit
+                           end if
+                        else
+                           next = ib%next
                         end if
-                    end if
-                    ib => ib%next
+                        ib = next
+                     else
+                        ib => ib%next
+                     end if
                 end select
             end do
 
-            if (.not. productive) then
-                if (nactive < max_active_batches) then
-                    nactive = nactive + 1
-                    ncurrent = ncurrent + 1
-                    call activate(ncurrent)
-                end if
+            if (.not. productive .and. nactive < max_active_batches) then
+               nactive = nactive + 1
+               ncurrent = ncurrent + 1
+               call activate(ncurrent)
             end if
-        end if
+         end if
     end do
 
 contains
@@ -163,16 +191,16 @@ contains
                 ! Associate new Batch and Comm with each other
                 new_comm%my_batch => new_batch
                 new_batch%my_comm => new_comm
-            end select
-            ! Start communication or set as pending
-            if (ncomm_started < max_comms) then
-                ncomm_started = ncomm_started + 1
-                !call start(new_comm)
-                new_batch%status = stat_waiting
-            else
-                new_batch%status = stat_pending
-            endif
-        end select
+               ! Start communication or set as pending
+                if (ncomm_started < max_comms) then
+                   ncomm_started = ncomm_started + 1
+                   call new_comm%start(new_batch%stage)
+                   new_batch%status = stat_waiting
+                else
+                   new_batch%status = stat_pending
+                endif
+             end select
+          end select
         write(*,*) "batch/comm", n, "activated"
     end subroutine activate
 
