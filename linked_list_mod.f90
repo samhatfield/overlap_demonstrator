@@ -107,11 +107,16 @@ contains
 
     if(.not. associated(node%prev)) then
        this%head => node%next
+       if(associated(node%next)) then
+          nullify(node%next%prev)
+       endif
     else
        node%prev%next => node%next
-    endif
-    if(.not. associated(node%next)) then
-       this%tail => node%prev
+       if(.not. associated(node%next)) then
+          this%tail => node%prev
+       else
+          node%next%prev = node%prev
+       endif
     endif
     deallocate(node%value)
     nullify(node)

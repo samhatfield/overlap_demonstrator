@@ -1,29 +1,23 @@
 program overlap_demonstrator
     use linked_list_m  , only: LinkedList, LinkedListNode
-    use overlap_types_mod , only: Batch, Comm, stat_waiting, stat_pending, CommList, BatchList
+    use overlap_types_mod !, only: Batch, Comm, stat_waiting, stat_pending, CommList, BatchList
     use common_data
-    use mpi
+    use common_mpi
+!    use mpi
     
     implicit none
 
-    type(CommList) :: active_comms
-    type(BatchList) :: active_batches
 
-    integer, parameter :: nbatches = 10
-    integer, parameter :: max_comms = 5
-    integer, parameter :: max_active_batches = 5
-    integer, parameter :: stage_final = 3
     logical :: comm_compl
     logical :: productive
 
-    integer :: nactive
     integer :: ndone
-    integer :: ncomm_started
     integer :: ncurrent,ierr,i
     type(LinkedListNode), pointer :: ic
     type(LinkedListNode), pointer :: ib,next
     type(Batch), pointer :: complete_comm_batch
-
+    type(comm), pointer :: c
+    
     ! Test everything works as expected
  !   write(*,*) "Testing BatchList/CommList functionality"
 
@@ -62,7 +56,8 @@ program overlap_demonstrator
     numsend = 100000
     numrecv = 100000
     
-    allocate(sendbuf(numsend*ntasks,nbatches))
+    allocate(sendbuf1(numsend*ntasks,nbatches))
+    allocate(sendbuf2(numsend*ntasks,nbatches))
     allocate(recvbuf(numrecv*ntasks,nbatches))
     allocate(send_reqs(ntasks,nbatches))
     allocate(recv_reqs(ntasks,nbatches))
@@ -110,7 +105,10 @@ program overlap_demonstrator
                 select type (thisBatch => ib%value)
                 type is (Batch)
                     if (thisBatch%status == stat_pending) then
-                        call thisBatch%my_comm%start(thisBatch%stage)
+                       print *,'Starting comm for pending branch ',thisBatch%id
+                       c => thisBatch%my_comm
+                       print *,'Comm ',c%id
+                       call thisBatch%my_comm%start(thisBatch%stage)
                         ncomm_started = ncomm_started + 1
                         exit
                     end if
@@ -167,7 +165,7 @@ program overlap_demonstrator
                 end select
             end do
 
-            if (.not. productive .and. nactive < max_active_batches) then
+            if (.not. productive .and. nactive < max_active_batches .and. ncurrent < nbatches) then
                nactive = nactive + 1
                ncurrent = ncurrent + 1
                call activate(ncurrent)
@@ -175,11 +173,16 @@ program overlap_demonstrator
          end if
     end do
 
+    print *,'Process ',mytask,'Completed'
+    call mpi_finalize(ierr)
+    
 contains
 
     subroutine activate(n)
         integer, intent(in) :: n
-
+        class(Batch), pointer :: new_batch,b
+        class(Comm), pointer :: new_comm,c
+        
         ! Add a new Batch and Comm to the respective lists
         call active_batches%append(Batch(n))
         call active_comms%append(Comm(n))
@@ -191,15 +194,22 @@ contains
                 ! Associate new Batch and Comm with each other
                 new_comm%my_batch => new_batch
                 new_batch%my_comm => new_comm
-            ! Start communication or set as pending
+                b => new_batch
+                c => new_comm
+                ! Start communication or set as pending
                 if (ncomm_started < max_comms) then
                    ncomm_started = ncomm_started + 1
                    call new_comm%start(new_batch%stage)
                    new_batch%status = stat_waiting
                 else
+                   print *,'Batch ',new_batch%id, ', stage 1 is pending'
                    new_batch%status = stat_pending
                 endif
              end select
+             if (ncomm_started >= max_comms) then
+                c => new_batch%my_comm
+                print *,'Comm ',c%id
+             endif
           end select
         write(*,*) "batch/comm", n, "activated"
     end subroutine activate

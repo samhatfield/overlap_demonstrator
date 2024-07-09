@@ -1,13 +1,11 @@
 module overlap_types_mod
   use linked_list_m, only: LinkedList, LinkedListNode
+  use common_mpi
   use common_data
-  use mpi
+  !use mpi
     
     implicit none
     private
-
-    integer, public, parameter :: stat_waiting = 1
-    integer, public, parameter :: stat_pending = 2
 
     type, public :: Batch
        integer :: stage
@@ -50,6 +48,9 @@ module overlap_types_mod
     contains
         procedure :: append => append_comm
     end type CommList
+
+    type(CommList), public :: active_comms
+    type(BatchList), public :: active_batches
 
 contains
 
@@ -121,7 +122,7 @@ contains
 
         do itask=1,ntasks
            do i=1,numsend
-              sendbuf(i+off(itask),this%id) = this%id * 0.0001 + i + off(itask)
+              sendbuf1(i+off(itask),this%id) = this%id * 0.0001 + i + off(itask)
            enddo
         enddo
         
@@ -135,11 +136,12 @@ contains
     end subroutine batch_associate_comm
 
     subroutine batch_execute(this)
-        class(Batch), intent(inout) :: this
+        class(Batch), intent(inout), target :: this
+        class(Comm), pointer :: new_comm
         real r
-        integer i,j
+        integer(8) i,j
         
-        write(*,*) "Batch", this%id, "executing"
+        write(*,*) "Batch", this%id, "executing stage ",this%stage
 
         select case (this%stage)
         case (1)
@@ -149,6 +151,25 @@ contains
               j = j + i*i
            enddo
            print *,j
+           call active_comms%append(Comm(this%id))
+
+        select type(new_comm => active_comms%tail%value)
+        type is (Comm)
+                ! Associate new Batch and Comm with each other
+           new_comm%my_batch => this
+           this%my_comm => new_comm
+            ! Start communication or set as pending
+           if (ncomm_started < max_comms) then
+              ncomm_started = ncomm_started + 1
+              print *,'Starting comm. ',this%id, ', stage ',this%stage+1
+              call new_comm%start(this%stage+1)
+              this%status = stat_waiting
+           else
+              print *,'Batch ',this%id, ', stage ',this%stage+1,' is pending'
+              this%status = stat_pending
+           endif
+        end select
+           
         case(2)
            ! Do Legendre
            call random_number(r)
@@ -184,7 +205,7 @@ contains
         integer ierr,flg
         
         ! Test whether this comm has finished yet (just always true for now)
-        write(*,*) "Checking completion of comm", this%id
+!        write(*,*) "Checking completion of comm", this%id
         call mpi_testall(this%nops,recv_reqs(:,this%id),comm_complete,mpi_statuses_ignore,ierr)
 
       end function comm_complete
@@ -202,7 +223,7 @@ contains
         case (1)
            do i=1,ntasks-1
               idest = mod(mytask+i,ntasks)
-              call mpi_isend(sendbuf(off(idest),this%id),numsend,MPI_REAL,idest, &
+              call mpi_isend(sendbuf1(off(idest),this%id),numsend,MPI_REAL,idest, &
                    mytask,mpi_comm_world,send_reqs(i,this%id),ierr)
               isource = mod(mytask-i+ntasks,ntasks)
               call mpi_irecv(recvbuf(off(isource),this%id),numrecv,MPI_REAL,isource,isource, &
@@ -210,7 +231,7 @@ contains
            enddo
            this%nops = ntasks-1
         case (2)
-           call mpi_ialltoall(sendbuf(1,this%id),numsend,MPI_REAL, &
+           call mpi_ialltoall(sendbuf2(1,this%id),numsend,MPI_REAL, &
                    recvbuf(1,this%id),numrecv,MPI_FLOAT,mpi_comm_world,recv_reqs(1,this%id),ierr)
         case default
            print *,'ERROR: incorrect stage',stage
@@ -223,11 +244,18 @@ contains
         implicit none
 
         class(Comm), intent(in) :: this
-        integer ierr
+        type(Batch), pointer :: mybatch
+        integer ierr,i
         
-        call mpi_waitall(this%nops,recv_reqs(:,this%id),mpi_statuses_ignore,ierr)
-        if(this%nops > 1) then
-           call mpi_waitall(this%nops,send_reqs(:,this%id),mpi_statuses_ignore,ierr)
+!        call mpi_waitall(this%nops,recv_reqs(:,this%id),mpi_statuses_ignore,ierr)
+!        if(this%nops > 1) then
+!           call mpi_waitall(this%nops,send_reqs(:,this%id),mpi_statuses_ignore,ierr)
+!        endif
+
+        if(this%my_batch%stage .eq. 1) then
+           do i=1,numsend
+              sendbuf2(i,this%id) = recvbuf(i,this%id)
+           enddo
         endif
         
     end subroutine finish
