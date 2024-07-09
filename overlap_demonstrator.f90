@@ -14,9 +14,8 @@ program overlap_demonstrator
     integer :: ndone
     integer :: ncurrent,ierr,i
     type(LinkedListNode), pointer :: ic
-    type(LinkedListNode), pointer :: ib,next
+    type(LinkedListNode), pointer :: ib,next,ib1
     type(Batch), pointer :: complete_comm_batch
-    type(comm), pointer :: c
     
     ! Test everything works as expected
  !   write(*,*) "Testing BatchList/CommList functionality"
@@ -79,40 +78,41 @@ program overlap_demonstrator
         ! Check whether any active communications have completed
         comm_compl = .false.
         productive = .false.
-        ic => active_comms%head
-        do while (associated(ic))
-            select type (thisComm => ic%value)
-            type is (Comm)
-                if (thisComm%complete()) then
-                    ! complete_comm(ic%value) step needed here?
-                    complete_comm_batch => thisComm%my_batch
-                    write(*,*) "Comm", thisComm%id, " complete"
-                    call thisComm%finish
-                    call active_comms%remove(ic)
-                    comm_compl = .true.
-                    ncomm_started = ncomm_started - 1
-                    exit
-                end if
-                ic => ic%next
+        ib => active_batches%head
+        do while (associated(ib))
+            select type (thisBatch => ib%value)
+            type is (Batch)
+               if(thisBatch%status .eq. stat_waiting) then
+                  if (thisBatch%comm_complete()) then
+                     ! complete_comm(ic%value) step needed here?
+                     write(*,*) "Comm", thisBatch%id, " complete"
+                     complete_comm_batch => thisBatch
+                     call thisBatch%finish_comm
+                     thisBatch%status = stat_exec
+                     comm_compl = .true.
+                     ncomm_started = ncomm_started - 1
+                     exit
+                  end if
+               endif
+                ib => ib%next
             end select
         end do
         
         if (comm_compl) then
             ! Now that one comm has completed, we can start the comm on the next batch whose comm is
             ! pending, if there is one
-            ib => active_batches%head
-            do while (associated(ib))
-                select type (thisBatch => ib%value)
+            ib1 => active_batches%head
+            do while (associated(ib1))
+                select type (thisBatch => ib1%value)
                 type is (Batch)
                     if (thisBatch%status == stat_pending) then
                        print *,'Starting comm for pending branch ',thisBatch%id
-                       c => thisBatch%my_comm
-                       print *,'Comm ',c%id
-                       call thisBatch%my_comm%start(thisBatch%stage)
-                        ncomm_started = ncomm_started + 1
+                       call thisBatch%start_comm(thisBatch%stage)
+                       thisBatch%status = stat_waiting
+                       ncomm_started = ncomm_started + 1
                         exit
                     end if
-                    ib => ib%next
+                    ib1 => ib1%next
                 end select
             end do
 
@@ -124,17 +124,17 @@ program overlap_demonstrator
                ! This doesn't work:
 !               call active_batches%remove(complete_comm_batch)
                
-               ib => active_batches%head
-                do while (associated(ib))
-                    select type (listBatch => ib%value)
-                    type is (Batch)
-                        if (listBatch%id == complete_comm_batch%id) then
+!               ib => active_batches%head
+!                do while (associated(ib))
+!                    select type (listBatch => ib%value)
+!                    type is (Batch)
+!                        if (listBatch%id == complete_comm_batch%id) then
                             call active_batches%remove(ib)
-                            exit
-                        end if
-                        ib => ib%next
-                    end select
-                end do
+!                            exit
+!                        end if
+!                        ib => ib%next
+!                    end select
+!                end do
                 nactive = nactive - 1
                 ndone = ndone + 1
             end if
@@ -181,36 +181,23 @@ contains
     subroutine activate(n)
         integer, intent(in) :: n
         class(Batch), pointer :: new_batch,b
-        class(Comm), pointer :: new_comm,c
         
         ! Add a new Batch and Comm to the respective lists
         call active_batches%append(Batch(n))
-        call active_comms%append(Comm(n))
 
         select type (new_batch => active_batches%tail%value)
         type is (Batch)
-            select type(new_comm => active_comms%tail%value)
-            type is (Comm)
-                ! Associate new Batch and Comm with each other
-                new_comm%my_batch => new_batch
-                new_batch%my_comm => new_comm
-                b => new_batch
-                c => new_comm
-                ! Start communication or set as pending
-                if (ncomm_started < max_comms) then
-                   ncomm_started = ncomm_started + 1
-                   call new_comm%start(new_batch%stage)
-                   new_batch%status = stat_waiting
-                else
-                   print *,'Batch ',new_batch%id, ', stage 1 is pending'
-                   new_batch%status = stat_pending
-                endif
-             end select
-             if (ncomm_started >= max_comms) then
-                c => new_batch%my_comm
-                print *,'Comm ',c%id
-             endif
-          end select
+           b => new_batch
+           ! Start communication or set as pending
+           if (ncomm_started < max_comms) then
+              ncomm_started = ncomm_started + 1
+              call new_batch%start_comm(new_batch%stage)
+              new_batch%status = stat_waiting
+           else
+              print *,'Batch ',new_batch%id, ', stage 1 is pending'
+              new_batch%status = stat_pending
+           endif
+        end select
         write(*,*) "batch/comm", n, "activated"
     end subroutine activate
 
@@ -220,8 +207,6 @@ contains
         select type(p => node%value)
             class is(Batch)
                 write(*,*) "Batch ID = ", p%id
-            class is(Comm)
-                write(*,*) "Got Comm"
         class default
             write(*,*) "ERROR"
         end select

@@ -14,42 +14,23 @@ module overlap_types_mod
        ! 3: Done
         integer :: status
         integer :: id
-        type(Comm), pointer :: my_comm
+        integer :: nops=1
     contains
-        procedure :: associate_comm => batch_associate_comm
         procedure :: execute => batch_execute
+        procedure :: start_comm
+        procedure :: finish_comm
+        procedure :: comm_complete
     end type Batch
 
     interface Batch
         module procedure :: batch_constructor
     end interface Batch
 
-    type, public :: Comm
-        integer :: id
-        integer :: nops=1
-        type(Batch), pointer :: my_batch
-    contains
-      procedure :: start
-      procedure :: finish
-      procedure :: complete => comm_complete
-        ! procedure :: get_batch
-    end type Comm
-
-    interface Comm
-        module procedure :: comm_constructor
-    end interface Comm
-
     type, public, extends(LinkedList) :: BatchList
     contains
         procedure :: append => append_batch
     end type BatchList
 
-    type, public, extends(LinkedList) :: CommList
-    contains
-        procedure :: append => append_comm
-    end type CommList
-
-    type(CommList), public :: active_comms
     type(BatchList), public :: active_batches
 
 contains
@@ -82,29 +63,6 @@ contains
 
     end subroutine append_batch
 
-    !> Add a value to the list at the tail
-    subroutine append_comm(this, value)
-        class(CommList), intent(inout) :: this
-        class(*), intent(in), target   :: value
-
-        type(LinkedListNode), pointer :: node_ptr, next_ptr, current_ptr
-
-        ! Create a new node and set the value
-        allocate(node_ptr)
-        allocate(node_ptr%value, source=value)
-        node_ptr%next => null()
-        this%size = this%size + 1
-
-        if (.not. associated(this%head))then
-           this%head => node_ptr
-           this%tail => node_ptr
-        else
-           this%tail%next => node_ptr
-           node_ptr%prev  => this%tail
-           this%tail      => node_ptr
-        end if
-
-    end subroutine append_comm
 
     ! -----------------------------------------------------------------------------
     ! Batch methods
@@ -126,18 +84,12 @@ contains
            enddo
         enddo
         
-    end function batch_constructor
+        this%nops = 1
 
-    subroutine batch_associate_comm(this, my_comm)
-        class(Batch), intent(inout) :: this
-        class(Comm), intent(in), target :: my_comm
-
-        this%my_comm => my_comm
-    end subroutine batch_associate_comm
+      end function batch_constructor
 
     subroutine batch_execute(this)
         class(Batch), intent(inout), target :: this
-        class(Comm), pointer :: new_comm
         real r
         integer(8) i,j
         
@@ -151,24 +103,16 @@ contains
               j = j + i*i
            enddo
            print *,j
-           call active_comms%append(Comm(this%id))
-
-        select type(new_comm => active_comms%tail%value)
-        type is (Comm)
-                ! Associate new Batch and Comm with each other
-           new_comm%my_batch => this
-           this%my_comm => new_comm
             ! Start communication or set as pending
            if (ncomm_started < max_comms) then
               ncomm_started = ncomm_started + 1
               print *,'Starting comm. ',this%id, ', stage ',this%stage+1
-              call new_comm%start(this%stage+1)
+              call this%start_comm(this%stage+1)
               this%status = stat_waiting
            else
               print *,'Batch ',this%id, ', stage ',this%stage+1,' is pending'
               this%status = stat_pending
            endif
-        end select
            
         case(2)
            ! Do Legendre
@@ -189,18 +133,11 @@ contains
     ! Comm methods
     ! -----------------------------------------------------------------------------
 
-    function comm_constructor(comm_index) result(this)
-      integer, intent(in)             :: comm_index
-        type(Comm) :: this
-        
-        this%id = comm_index
-        this%nops = 1
-    end function comm_constructor
 
     function comm_complete(this)
       use mpi
       
-      class(Comm), intent(in) :: this
+      class(Batch), intent(in) :: this
         logical :: comm_complete
         integer ierr,flg
         
@@ -210,12 +147,12 @@ contains
 
       end function comm_complete
 
-      subroutine start(this,stage)
+      subroutine start_comm(this,stage)
         use common_data
         use mpi
         implicit none
       
-        class(Comm), intent(inout) :: this
+        class(Batch), intent(inout) :: this
         integer, intent(in) :: stage
         integer i,isource,idest,ierr
 
@@ -237,14 +174,13 @@ contains
            print *,'ERROR: incorrect stage',stage
         end select
         
-      end subroutine start
+      end subroutine start_comm
       
-      subroutine finish(this)
+      subroutine finish_comm(this)
         use mpi
         implicit none
 
-        class(Comm), intent(in) :: this
-        type(Batch), pointer :: mybatch
+        class(Batch), intent(in) :: this
         integer ierr,i
         
 !        call mpi_waitall(this%nops,recv_reqs(:,this%id),mpi_statuses_ignore,ierr)
@@ -252,12 +188,12 @@ contains
 !           call mpi_waitall(this%nops,send_reqs(:,this%id),mpi_statuses_ignore,ierr)
 !        endif
 
-        if(this%my_batch%stage .eq. 1) then
+        if(this%stage .eq. 1) then
            do i=1,numsend
               sendbuf2(i,this%id) = recvbuf(i,this%id)
            enddo
         endif
         
-    end subroutine finish
+      end subroutine finish_comm
     
 end module overlap_types_mod

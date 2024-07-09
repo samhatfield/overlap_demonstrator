@@ -6,6 +6,7 @@ module common_data
   integer, public, parameter :: stage_final = 3
   integer, public, parameter :: stat_waiting = 1
   integer, public, parameter :: stat_pending = 2
+  integer, public, parameter :: stat_exec = 3
   integer :: ncomm_started
   integer :: nactive
   
