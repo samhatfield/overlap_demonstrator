@@ -71,7 +71,7 @@ contains
 
     function batch_constructor(batch_index) result(this)
         integer, intent(in) :: batch_index
-        integer i,itask
+        integer :: i, itask
         
         type(Batch) :: this
 
@@ -80,48 +80,47 @@ contains
         this%id = batch_index
 
         do itask=1,ntasks
-           do i=1,numsend
-              sendbuf1(i+off(itask),this%id) = this%id * 0.0001 + i + off(itask)
-           enddo
+            do i=1,numsend
+                sendbuf1(i+off(itask),this%id) = this%id * 0.0001 + i + off(itask)
+            enddo
         enddo
         
         this%nops = 1
 
-      end function batch_constructor
+    end function batch_constructor
 
     subroutine batch_execute(this)
         class(Batch), intent(inout), target :: this
-        real r
-        integer(8) i,j
+        real :: r
+        integer(8) :: i, j
         
         write(*,*) "Batch", this%id, "executing stage ",this%stage
 
         select case (this%stage)
         case (1)
-           ! Do FFT
-           call random_number(r)
-           do i=1,r*10000
-              j = j + i*i
-           enddo
-           print *,j
+            ! Do FFT
+            call random_number(r)
+            do i=1,r*10000
+                j = j + i*i
+            enddo
+            print *,j
             ! Start communication or set as pending
-           if (ncomm_started < max_comms) then
-              ncomm_started = ncomm_started + 1
-              print *,'Starting comm. ',this%id, ', stage ',this%stage+1
-              call this%start_comm(this%stage+1)
-              this%status = stat_waiting
-           else
-              print *,'Batch ',this%id, ', stage ',this%stage+1,' is pending'
-              this%status = stat_pending
-           endif
-           
+            if (ncomm_started < max_comms) then
+                ncomm_started = ncomm_started + 1
+                print *,'Starting comm. ',this%id, ', stage ',this%stage+1
+                call this%start_comm(this%stage+1)
+                this%status = stat_waiting
+            else
+                print *,'Batch ',this%id, ', stage ',this%stage+1,' is pending'
+                this%status = stat_pending
+            endif
         case(2)
-           ! Do Legendre
-           call random_number(r)
-           do i=1,r*40000
-              j = j + i*i
-           enddo
-           print *,j
+            ! Do Legendre
+            call random_number(r)
+            do i=1,r*40000
+                j = j + i*i
+            enddo
+            print *,j
         case default
         end select
 
@@ -135,52 +134,48 @@ contains
     ! -----------------------------------------------------------------------------
 
     function comm_complete(this)
-      use mpi
-      
-      class(Batch), intent(in) :: this
+        use mpi, only: mpi_testall, mpi_statuses_ignore
+
+        class(Batch), intent(in) :: this
         logical :: comm_complete
-        integer ierr,flg
+        integer ierr
         
         ! Test whether this comm has finished yet (just always true for now)
-!        write(*,*) "Checking completion of comm", this%id
         call mpi_testall(this%nops,recv_reqs(:,this%id),comm_complete,mpi_statuses_ignore,ierr)
-      end function comm_complete
+    end function comm_complete
 
-      subroutine start_comm(this,stage)
+    subroutine start_comm(this,stage)
         use common_data
-        use mpi
-        implicit none
+        use mpi, only: mpi_isend, mpi_recv, mpi_real, mpi_float, mpi_comm_world, mpi_ialltoall
       
         class(Batch), intent(inout) :: this
         integer, intent(in) :: stage
-        integer i,isource,idest,ierr
+        integer :: i, isource, idest, ierr
 
         select case(stage)
         case (1)
-           do i=1,ntasks-1
-              idest = mod(mytask+i,ntasks)
-              call mpi_isend(sendbuf1(off(idest),this%id),numsend,MPI_REAL,idest, &
-                   mytask,mpi_comm_world,send_reqs(i,this%id),ierr)
-              isource = mod(mytask-i+ntasks,ntasks)
-              call mpi_irecv(recvbuf(off(isource),this%id),numrecv,MPI_REAL,isource,isource, &
-                   mpi_comm_world,recv_reqs(i,this%id),ierr)
-           enddo
-           this%nops = ntasks-1
+            do i=1,ntasks-1
+                idest = mod(mytask+i,ntasks)
+                call mpi_isend(sendbuf1(off(idest),this%id),numsend,MPI_REAL,idest, &
+                    & mytask,mpi_comm_world,send_reqs(i,this%id),ierr)
+                isource = mod(mytask-i+ntasks,ntasks)
+                call mpi_irecv(recvbuf(off(isource),this%id),numrecv,MPI_REAL,isource,isource, &
+                    & mpi_comm_world,recv_reqs(i,this%id),ierr)
+            enddo
+            this%nops = ntasks-1
         case (2)
-           call mpi_ialltoall(sendbuf2(1,this%id),numsend,MPI_REAL, &
-                   recvbuf(1,this%id),numrecv,MPI_FLOAT,mpi_comm_world,recv_reqs(1,this%id),ierr)
+            call mpi_ialltoall(sendbuf2(1,this%id),numsend,MPI_REAL, &
+                & recvbuf(1,this%id),numrecv,MPI_FLOAT,mpi_comm_world,recv_reqs(1,this%id),ierr)
         case default
-           print *,'ERROR: incorrect stage',stage
+            print *,'ERROR: incorrect stage',stage
         end select
-        
-      end subroutine start_comm
-      
-      subroutine finish_comm(this)
+    end subroutine start_comm
+
+    subroutine finish_comm(this)
         use mpi
-        implicit none
 
         class(Batch), intent(in) :: this
-        integer ierr,i
+        integer :: ierr,i
         
 !        call mpi_waitall(this%nops,recv_reqs(:,this%id),mpi_statuses_ignore,ierr)
 !        if(this%nops > 1) then
@@ -188,11 +183,10 @@ contains
 !        endif
 
         if(this%stage .eq. 1) then
-           do i=1,numsend
-              sendbuf2(i,this%id) = recvbuf(i,this%id)
-           enddo
+            do i=1,numsend
+                sendbuf2(i,this%id) = recvbuf(i,this%id)
+            enddo
         endif
-        
-      end subroutine finish_comm
-    
+    end subroutine finish_comm
+
 end module overlap_types_mod
