@@ -1,14 +1,13 @@
 module common_data
-  use mpi
-  
-  integer ntasks
-  integer mytask
-  integer numsend
-  integer numrecv
 
-  real(4), allocatable :: sendbuf(:,:),recvbuf(:,:)
-  integer, allocatable :: off(:)
-!  type(mpi_request), allocatable :: recv_reqs(:,:),send_reqs(:,:)
-  integer, allocatable :: recv_reqs(:,:),send_reqs(:,:)
+  integer, public, parameter :: nbatches = 10
+  integer, public, parameter :: max_comms = 2
+  integer, public, parameter :: max_active_batches = 3
+  integer, public, parameter :: stage_final = 3
+  integer, public, parameter :: stat_waiting = 1
+  integer, public, parameter :: stat_pending = 2
+  integer, public, parameter :: stat_exec = 3
+  integer :: ncomm_started
+  integer :: nactive
   
 end module common_data
