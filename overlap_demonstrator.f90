@@ -1,9 +1,11 @@
 program overlap_demonstrator
     use linked_list_m  , only: LinkedList, LinkedListNode
     use overlap_types_mod !, only: Batch, Comm, stat_waiting, stat_pending, CommList, BatchList
-    use common_data
-    use common_mpi
-!    use mpi
+    use common_data, only: nbatches, max_comms, max_active_batches, stage_final, stat_waiting, &
+        & stat_pending, stat_exec, ncomm_started, nactive
+    use common_mpi, only: ntasks, mytask, numsend, numrecv, sendbuf1, sendbuf2, recvbuf, off, &
+        & recv_reqs, send_reqs
+    use mpi, only: mpi_init, mpi_comm_rank, mpi_comm_world, mpi_comm_size, mpi_finalize
     
     implicit none
 

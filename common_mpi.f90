@@ -1,10 +1,8 @@
-module common_mpi
-  use mpi
-  
-  integer ntasks
-  integer mytask
-  integer numsend
-  integer numrecv
+module common_mpi  
+  integer :: ntasks
+  integer :: mytask
+  integer :: numsend
+  integer :: numrecv
 
   real(4), allocatable :: sendbuf1(:,:),sendbuf2(:,:),recvbuf(:,:)
   integer, allocatable :: off(:)
