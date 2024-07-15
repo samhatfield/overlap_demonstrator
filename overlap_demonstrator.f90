@@ -6,7 +6,7 @@ program overlap_demonstrator
     use common_mpi, only: ntasks, mytask, numsend, numrecv, sendbuf1, sendbuf2, recvbuf, off, &
         & recv_reqs, send_reqs
     use mpi, only: mpi_init, mpi_comm_rank, mpi_comm_world, mpi_comm_size, mpi_finalize
-    
+
     implicit none
 
     logical :: comm_compl

@@ -3,8 +3,7 @@ module overlap_types_mod
     use common_data, only: max_comms, stat_waiting, stat_pending, ncomm_started
     use common_mpi, only: ntasks, mytask, numsend, numrecv, sendbuf1, sendbuf2, recvbuf, off, &
         & recv_reqs, send_reqs
-    use mpi, only: mpi_testall
-    
+
     implicit none
     private
 
