@@ -53,7 +53,7 @@ program overlap_demonstrator
             type is (Batch)
                 if (thisBatch%status .eq. stat_waiting) then
                     if (thisBatch%comm_complete()) then
-                        write(*,*) "Comm", thisBatch%id, " complete"
+                        write(*,*) "Rank", mytask, "Batch", thisBatch%id, " comm complete"
                         complete_comm_batch => thisBatch
                         call thisBatch%finish_comm
                         thisBatch%status = stat_exec
@@ -74,7 +74,7 @@ program overlap_demonstrator
                 select type (thisBatch => ib1%value)
                 type is (Batch)
                     if (thisBatch%status == stat_pending) then
-                        print *,'Starting comm for pending branch ',thisBatch%id
+                        write(*,*) "Rank", mytask, 'Starting comm for pending batch ',thisBatch%id
                         call thisBatch%start_comm(thisBatch%stage)
                         thisBatch%status = stat_waiting
                         ncomm_started = ncomm_started + 1
@@ -127,7 +127,7 @@ program overlap_demonstrator
          end if
     end do
 
-    print *,'Process ',mytask,'Completed'
+    write(*,*) "Rank", mytask, 'Process ',mytask,'Completed'
     call mpi_finalize(ierr)
 
 contains
@@ -146,12 +146,12 @@ contains
                 ncomm_started = ncomm_started + 1
                 call new_batch%start_comm(new_batch%stage)
                 new_batch%status = stat_waiting
+                write(*,*) "Rank", mytask, 'Batch ',new_batch%id, ', stage 1 is waiting'
             else
-                print *,'Batch ',new_batch%id, ', stage 1 is pending'
+                write(*,*) "Rank", mytask, 'Batch ',new_batch%id, ', stage 1 is pending'
                 new_batch%status = stat_pending
             endif
         end select
-        write(*,*) "batch/comm", n, "activated"
     end subroutine activate
 
     subroutine print_ids(node)

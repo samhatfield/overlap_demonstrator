@@ -94,7 +94,7 @@ contains
         real :: r
         integer(8) :: i, j
         
-        write(*,*) "Batch", this%id, "executing stage ",this%stage
+        write(*,*) "Rank", mytask, "Batch", this%id, "executing stage ",this%stage
 
         select case (this%stage)
         case (1)
@@ -103,15 +103,14 @@ contains
             do i=1,r*10000
                 j = j + i*i
             enddo
-            print *,j
             ! Start communication or set as pending
             if (ncomm_started < max_comms) then
                 ncomm_started = ncomm_started + 1
-                print *,'Starting comm. ',this%id, ', stage ',this%stage+1
+                write(*,*) "Rank", mytask, 'Starting comm. ',this%id, ', stage ',this%stage+1
                 call this%start_comm(this%stage+1)
                 this%status = stat_waiting
             else
-                print *,'Batch ',this%id, ', stage ',this%stage+1,' is pending'
+                write(*,*) "Rank", mytask, 'Batch ',this%id, ', stage ',this%stage+1,' is pending'
                 this%status = stat_pending
             endif
         case(2)
@@ -120,7 +119,6 @@ contains
             do i=1,r*40000
                 j = j + i*i
             enddo
-            print *,j
         case default
         end select
 
@@ -167,7 +165,7 @@ contains
             call mpi_ialltoall(sendbuf2(1,this%id),numsend,MPI_REAL, &
                 & recvbuf(1,this%id),numrecv,MPI_FLOAT,mpi_comm_world,recv_reqs(1,this%id),ierr)
         case default
-            print *,'ERROR: incorrect stage',stage
+            write(*,*) 'ERROR: incorrect stage',stage
         end select
     end subroutine start_comm
 
